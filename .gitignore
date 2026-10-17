@@ -1,0 +1,45 @@
+# Local agent configuration, credentials, and browser state
+.codex/
+.playwright-mcp/
+.claude/
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+auth.json
+credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+
+# Dependencies, build output, runtime data, and backups
+node_modules/
+vendor/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.dart_tool/
+.flutter-plugins-dependencies
+build/
+dist/
+coverage/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+*.sql.gz
+backups/
+uploads/
+
+# Local editor and operating system state
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
