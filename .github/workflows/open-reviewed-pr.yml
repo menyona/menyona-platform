@@ -1,0 +1,41 @@
+name: Open reviewed pull request
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Existing work/ or ci-probe/ branch in this repository
+        required: true
+        type: string
+      title:
+        description: Pull request title
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pull-request:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require the trusted main workflow
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          test "$WORKFLOW_REF" = "$GITHUB_REPOSITORY/.github/workflows/open-reviewed-pr.yml@refs/heads/main"
+      - name: Check out trusted workflow revision only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Open a PR without merging or approving it
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_BRANCH: ${{ inputs.branch }}
+          PR_TITLE: ${{ inputs.title }}
+        run: python3 -I scripts/open_review_pr.py

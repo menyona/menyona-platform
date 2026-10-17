@@ -1,0 +1,7 @@
+{
+  "github_owned_allowed": false,
+  "verified_allowed": false,
+  "patterns_allowed": [
+    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+  ]
+}

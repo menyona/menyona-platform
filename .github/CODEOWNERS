@@ -1,0 +1,4 @@
+# A real approval from this trusted account is required by main protection.
+# The independent security agent performs the review using this delegated account.
+# GitHub Actions is deliberately not a code owner.
+* @dukkanai

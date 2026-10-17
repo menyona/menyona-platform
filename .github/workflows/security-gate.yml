@@ -1,0 +1,43 @@
+name: Security review gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Pull request number to verify against the current main branch
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+  statuses: write
+
+concurrency:
+  group: security-review-${{ inputs.pull_request }}
+  cancel-in-progress: false
+
+jobs:
+  verify-security-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Require the trusted main workflow
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          test "$WORKFLOW_REF" = "$GITHUB_REPOSITORY/.github/workflows/security-gate.yml@refs/heads/main"
+      - name: Check out trusted workflow revision only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify authenticated review and CI evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR_NUMBER: ${{ inputs.pull_request }}
+        run: python3 -I scripts/security_gate.py --repository "$GITHUB_REPOSITORY" --pull-request "$PR_NUMBER" --policy SECURITY_REVIEW_POLICY.md

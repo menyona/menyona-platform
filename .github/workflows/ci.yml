@@ -1,0 +1,30 @@
+name: Repository CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci-validation:
+    name: ci-validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out the event revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Test repository validation including rejection cases
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Validate tracked files without network access
+        run: python3 scripts/validate_repository.py
