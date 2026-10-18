@@ -39,7 +39,7 @@ def fixture():
         "head_commit": {"sha": HEAD, "commit": {"tree": {"sha": TREE}}},
         "comparison": {"status": "ahead", "merge_base_commit": {"sha": BASE}},
         "reviews": [{"id": 10, "state": "APPROVED", "commit_id": HEAD,
-                     "user": {"login": "dukkanai", "type": "User"},
+                     "user": {"id": 255427171, "login": "dukkanai", "type": "User"},
                      "author_association": "OWNER", "submitted_at": "2026-10-17T11:01:00Z",
                      "body": json.dumps(body)}],
         "workflow": {"id": 21, "path": gate.WORKFLOW_PATH, "state": "active"},
@@ -117,14 +117,48 @@ class SecurityGateTests(unittest.TestCase):
         data["reviews"] = []
         self.reject(data)
 
-    def test_wrong_owner_and_bot_and_outside_association(self):
-        for field, value in (("login", "attacker"), ("type", "Bot")):
+    def test_wrong_owner_id_login_and_bot_are_rejected(self):
+        for field, value in (("id", 999), ("login", "attacker"), ("type", "Bot"),
+                             ("login", 255427171), ("type", True)):
             data = fixture()
             data["reviews"][0]["user"][field] = value
             self.reject(data)
+
+    def test_reviewer_id_must_be_an_integer_not_bool_float_or_string(self):
+        for value in (True, False, None, "255427171", 255427171.0):
+            with self.subTest(value=value):
+                data = fixture()
+                data["reviews"][0]["user"]["id"] = value
+                self.reject(data)
         data = fixture()
-        data["reviews"][0]["author_association"] = "NONE"
+        del data["reviews"][0]["user"]["id"]
         self.reject(data)
+
+    def test_association_visibility_does_not_change_stable_identity_acceptance(self):
+        for association in ("OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR", "NONE"):
+            with self.subTest(association=association):
+                data = fixture()
+                data["reviews"][0]["author_association"] = association
+                self.validate(data)
+        data = fixture()
+        del data["reviews"][0]["author_association"]
+        self.validate(data)
+
+    def test_public_association_cannot_authorize_wrong_account(self):
+        for association in ("CONTRIBUTOR", "NONE", "OWNER"):
+            data = fixture()
+            data["reviews"][0]["author_association"] = association
+            data["reviews"][0]["user"]["id"] = 999
+            self.reject(data)
+
+    def test_later_inconsistent_identity_cannot_reuse_earlier_approval(self):
+        for field, value in (("id", 999), ("login", "renamed-account"), ("type", "Bot")):
+            data = fixture()
+            later = copy.deepcopy(data["reviews"][0])
+            later.update(id=11, state="CHANGES_REQUESTED")
+            later["user"][field] = value
+            data["reviews"].append(later)
+            self.reject(data)
 
     def test_latest_owner_review_supersedes_earlier_approval(self):
         for state in ("DISMISSED", "CHANGES_REQUESTED", "COMMENTED", "PENDING"):
@@ -138,6 +172,7 @@ class SecurityGateTests(unittest.TestCase):
         data = fixture()
         later = copy.deepcopy(data["reviews"][0])
         later.update(id=99, state="COMMENTED")
+        later["user"]["id"] = 999
         later["user"]["login"] = "reader"
         data["reviews"].append(later)
         self.validate(data)

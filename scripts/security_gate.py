@@ -23,6 +23,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 REVIEWER = "dukkanai"
+REVIEWER_ID = 255427171
 CONTEXT = "security-review"
 WORKFLOW_PATH = ".github/workflows/ci.yml"
 REQUIRED_TESTS = frozenset({
@@ -80,14 +81,22 @@ def integer(value: Any) -> bool:
 def validate_review(reviews: list[dict[str, Any]], expected: dict[str, Any],
                     now: datetime) -> tuple[int, str]:
     """Only the latest actual native review by the configured owner counts."""
-    owner_reviews = [r for r in reviews if r.get("user", {}).get("login") == REVIEWER]
+    # author_association varies with the API caller's visibility. Authenticate
+    # the native review using GitHub's stable numeric account ID and exact login.
+    # Include either matching identifier so an inconsistent later identity can
+    # never be ignored in favor of an earlier approval.
+    owner_reviews = [r for r in reviews if
+                     r.get("user", {}).get("login") == REVIEWER or
+                     r.get("user", {}).get("id") == REVIEWER_ID]
     require(bool(owner_reviews), "Required owner review is missing")
     require(all(integer(r.get("id")) for r in owner_reviews), "Invalid review identity")
+    require(all(integer(r.get("user", {}).get("id")) and
+                r["user"]["id"] == REVIEWER_ID and
+                r["user"].get("login") == REVIEWER and
+                r["user"].get("type") == "User" for r in owner_reviews),
+            "Reviewer account identity is not authorized")
     review = max(owner_reviews, key=lambda r: r["id"])
     require(review.get("state") == "APPROVED", "Latest owner review is not APPROVED")
-    require(review.get("user", {}).get("type") == "User", "Reviewer must be a user")
-    require(review.get("author_association") in {"OWNER", "MEMBER", "COLLABORATOR"},
-            "Reviewer association is not authorized")
     require(review.get("commit_id") == expected["head_sha"], "Review is for a stale head")
     body = review.get("body")
     require(isinstance(body, str) and len(body.encode("utf-8")) <= 65536,
