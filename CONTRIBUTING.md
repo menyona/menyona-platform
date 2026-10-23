@@ -20,7 +20,7 @@ python3 scripts/validate_repository.py
 
 يفتح المشغل المخوّل طلب التغيير بواسطة workflow باسم Open reviewed pull request، من main، مع اسم فرع العمل وعنوان واضح. يتحقق المشغل من أن الطلب يستهدف main ويشير إلى الرأس المقصود. لا تمنح هوية bot موافقة أمنية، ولا يدمج هذا workflow الطلب.
 
-إذا لم يبدأ CI تلقائيًا، يشغل المخوّل Repository CI على فرع العمل المحدد. يجب انتظار نجاح أحدث تشغيل للنسخة نفسها؛ وجود نتيجة قديمة أو فحص متخطى لا يكفي.
+ينتظر المشغل نجاح CI المرتبط بطلب التغيير نفسه، بحدث pull_request. إذا توقف تشغيل طلب أنشأه bot بحالة action_required، يفحص المخوّل النسخة ثم يعتمد تشغيلها أو يعيد تشغيل CI الأصلي؛ ثبت نجاح إعادة التشغيل في هذا المستودع. تشغيل Repository CI يدويًا بحدث workflow_dispatch يوفر دليل اختبار إضافيًا، لكنه لا يستوفي فحص الدمج الإلزامي في GitHub. يجب التحقق من ظهور ci-validation ناجحًا ضمن فحوص PR، إضافة إلى نجاح أحدث تشغيل تختاره بوابة الأمن؛ وجود نتيجة قديمة أو فحص متخطى لا يكفي. يوضح [توثيق GitHub](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated) الأحداث التي تحتسبها الحماية.
 
 ## الاعتماد والدمج
 
