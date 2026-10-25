@@ -13,5 +13,5 @@ update_option('woocommerce_custom_orders_table_enabled', 'yes');
 update_option('woocommerce_custom_orders_table_data_sync_enabled', 'no');
 $activation = activate_plugin('woocommerce/woocommerce.php');
 if (is_wp_error($activation)) { throw new RuntimeException('WooCommerce activation failed.'); }
-switch_theme('storefront');
+switch_theme('menyona-lab');
 echo json_encode(['installed' => true]) . "\n";

@@ -1,0 +1,17 @@
+/*
+Theme Name: Menyona Compatibility Child
+Template: storefront
+Version: 0.0.1
+Description: Local compatibility-only child theme; no restaurant branding release.
+*/
+.woocommerce-info {
+    background-color: #075985;
+    color: #ffffff;
+}
+.woocommerce-info a,
+.woocommerce-info a:hover,
+.woocommerce-info a:focus {
+    color: #ffffff;
+    opacity: 1;
+    text-decoration: underline;
+}

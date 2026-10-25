@@ -238,6 +238,9 @@ def prepare(cache):
             target = wordpress / 'wp-content' / target
         unpack(archive, target)
     shutil.copyfile(ROOT/'lab/wp-config.php', wordpress/'wp-config.php')
+    child=wordpress/'wp-content/themes/menyona-lab'
+    child.mkdir()
+    shutil.copyfile(ROOT/'lab/style.css',child/'style.css')
     shutil.copyfile(ROOT/'lab/lab-guard.php', wordpress/'wp-content/mu-plugins/lab-guard.php')
     helpers = build/'helpers'
     helpers.mkdir()

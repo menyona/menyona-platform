@@ -12,6 +12,7 @@ function check_lab($name, $condition) {
 }
 check_lab('hpos_active', Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled());
 check_lab('storefront_active', get_template() === 'storefront');
+check_lab('lab_child_theme_active', get_stylesheet() === 'menyona-lab');
 check_lab('synthetic_store_visible', get_option('woocommerce_coming_soon') === 'no');
 check_lab('external_http_blocked', is_wp_error(wp_remote_get('https://example.invalid')));
 $product = wc_get_product($fixture['product']);
