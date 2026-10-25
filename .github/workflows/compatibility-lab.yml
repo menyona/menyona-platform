@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      LAB_STATE_PARENT: ${{ runner.temp }}/menyona-compatibility
       LAB_CHROMIUM_EXECUTABLE: /opt/google/chrome/chrome
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,6 +24,7 @@ jobs:
           python3 scripts/validate_repository.py
       - name: Prepare pinned local experiment
         run: |
+          export LAB_STATE_PARENT="$RUNNER_TEMP/menyona-compatibility"
           python3 scripts/run_compatibility_lab.py prepare > "$RUNNER_TEMP/lab-prepare.txt"
           python3 - <<'PY'
           import os,pathlib
