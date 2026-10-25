@@ -15,3 +15,6 @@ Description: Local compatibility-only child theme; no restaurant branding releas
     opacity: 1;
     text-decoration: underline;
 }
+.site-header-cart .cart-contents .count {
+    opacity: 1;
+}
