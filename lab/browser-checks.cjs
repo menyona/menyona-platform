@@ -36,7 +36,7 @@ function check(name, result) { checks[name] = !!result; if (!result) throw Error
     await page.goto(`${base}/?page_id=${fixtures.a.cart}`, {waitUntil: 'networkidle'});
     check('cart_has_product', await page.locator('.cart_item').count() === 1);
     await page.goto(`${base}/?page_id=${fixtures.a.checkout}`, {waitUntil: 'networkidle'});
-    const fields = {billing_first_name:'عميل', billing_last_name:'تجريبي', billing_address_1:'عنوان وهمي', billing_city:'مدينة تجريبية', billing_postcode:'12345', billing_phone:'0500000000', billing_email:'guest@example.invalid'};
+    const fields = {billing_first_name:'عميل', billing_last_name:'تجريبي', billing_address_1:'عنوان وهمي', billing_city:'مدينة تجريبية', billing_state:'منطقة تجريبية', billing_postcode:'12345', billing_phone:'0500000000', billing_email:'guest@example.invalid'};
     for (const [id,value] of Object.entries(fields)) {
       const input = page.locator('#'+id);
       check('label_'+id, await input.evaluate(el => [...el.labels].some(label=>label.textContent.trim())));

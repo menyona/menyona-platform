@@ -66,7 +66,7 @@ def http_checkout(fixtures, credentials):
     nonce=re.search(r'name="woocommerce-process-checkout-nonce"[^>]*value="([^"]+)"',checkout)
     if not nonce: raise RuntimeError('Classic checkout nonce missing')
     fields={'billing_first_name':'عميل','billing_last_name':'اختبار','billing_country':'SA',
-            'billing_address_1':'عنوان وهمي','billing_city':'مدينة تجريبية','billing_postcode':'12345',
+            'billing_address_1':'عنوان وهمي','billing_city':'مدينة تجريبية','billing_state':'منطقة تجريبية','billing_postcode':'12345',
             'billing_phone':'0500000000','billing_email':'guest@example.invalid',
             'payment_method':'cod','shipping_method[0]':fixtures['a']['shipping_method'],
             'woocommerce-process-checkout-nonce':nonce[1],'terms':'1','order_total':'0.01'}
