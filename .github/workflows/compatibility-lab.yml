@@ -1,0 +1,51 @@
+name: Local stack compatibility experiment
+on:
+  push:
+    branches: [work/compatibility-lab]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: compatibility-lab-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  compatibility-lab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      LAB_STATE_PARENT: ${{ runner.temp }}/menyona-compatibility
+      LAB_CHROMIUM_EXECUTABLE: /opt/google/chrome/chrome
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate the reviewed source
+        run: |
+          python3 -m unittest discover -s tests
+          python3 scripts/validate_repository.py
+      - name: Prepare pinned local experiment
+        run: |
+          python3 scripts/run_compatibility_lab.py prepare > "$RUNNER_TEMP/lab-prepare.txt"
+          python3 - <<'PY'
+          import os,pathlib
+          lines=(pathlib.Path(os.environ['RUNNER_TEMP'])/'lab-prepare.txt').read_text().splitlines()
+          state=next(x.removeprefix('Prepared private laboratory state: ') for x in lines if x.startswith('Prepared private laboratory state: '))
+          with open(os.environ['GITHUB_ENV'],'a') as stream: stream.write('LAB_STATE='+state+'\n')
+          PY
+      - name: Run isolated synthetic stores and sandboxed browser
+        run: python3 scripts/run_compatibility_lab.py run --state "$LAB_STATE"
+      - name: Report sanitized experiment evidence
+        if: always() && env.LAB_STATE != ''
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib
+          path=pathlib.Path(os.environ['LAB_STATE'])/'evidence.json'
+          if path.exists():
+              evidence=json.loads(path.read_text())
+              print(json.dumps(evidence,ensure_ascii=False,indent=2))
+          else:
+              print('Experiment did not complete; raw diagnostics and credentials are not published.')
+          PY
+      - name: Stop this experiment only
+        if: always() && env.LAB_STATE != ''
+        run: python3 scripts/run_compatibility_lab.py stop --state "$LAB_STATE"

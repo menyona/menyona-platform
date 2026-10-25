@@ -1,0 +1,155 @@
+x-web: &web
+  image: ${LAB_IMAGE:?}
+  build:
+    context: ${LAB_BUILD_DIR:?}
+    network: none
+    args:
+      WORDPRESS_IMAGE: ${LAB_WP_IMAGE:?}
+  user: '33:33'
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  mem_limit: 512m
+  cpus: 0.5
+  pids_limit: 80
+  restart: 'no'
+  labels:
+    org.menyona.compatibility: ${LAB_INSTANCE:?}
+  tmpfs:
+    - /tmp:size=67108864,mode=1777
+    - /tmp/apache2:size=16777216,uid=33,gid=33,mode=0750
+  logging:
+    driver: json-file
+    options: {max-size: 3m, max-file: '1'}
+x-db: &db
+  image: ${LAB_DB_IMAGE:?}
+  user: mysql
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  mem_limit: 320m
+  cpus: 0.25
+  pids_limit: 80
+  restart: 'no'
+  labels:
+    org.menyona.compatibility: ${LAB_INSTANCE:?}
+  command: ['--innodb-buffer-pool-size=64M', '--max-connections=20', '--skip-log-bin']
+  tmpfs:
+    - /tmp:size=33554432,mode=1777
+    - /run/mysqld:size=16777216,mode=0777
+  healthcheck:
+    test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+    interval: 3s
+    timeout: 3s
+    retries: 40
+  logging:
+    driver: json-file
+    options: {max-size: 3m, max-file: '1'}
+x-proxy: &proxy
+  image: ${LAB_PROXY_IMAGE:?}
+  build:
+    context: ${LAB_BUILD_DIR:?}
+    dockerfile: Dockerfile.proxy
+    network: none
+    args:
+      CADDY_IMAGE: ${LAB_CADDY_IMAGE:?}
+  user: '33:33'
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  mem_limit: 64m
+  cpus: 0.1
+  pids_limit: 80
+  restart: 'no'
+  labels:
+    org.menyona.compatibility: ${LAB_INSTANCE:?}
+  command: ['caddy', 'run', '--config', '/etc/caddy/Caddyfile']
+  volumes:
+    - ${LAB_BUILD_DIR:?}/Caddyfile:/etc/caddy/Caddyfile:ro
+  tmpfs:
+    - /tmp:size=16777216,mode=1777
+    - /data:size=16777216,uid=33,gid=33,mode=0700
+    - /config:size=16777216,uid=33,gid=33,mode=0700
+  logging:
+    driver: json-file
+    options: {max-size: 3m, max-file: '1'}
+services:
+  db_a:
+    <<: *db
+    environment:
+      MARIADB_DATABASE: tenant_a
+      MARIADB_USER: tenant_a
+      MARIADB_PASSWORD_FILE: /run/secrets/db_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root
+    secrets:
+      - {source: a_db, target: db_password}
+      - {source: a_root, target: db_root}
+    volumes: [a_db:/var/lib/mysql]
+    networks: [a]
+  db_b:
+    <<: *db
+    environment:
+      MARIADB_DATABASE: tenant_b
+      MARIADB_USER: tenant_b
+      MARIADB_PASSWORD_FILE: /run/secrets/db_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root
+    secrets:
+      - {source: b_db, target: db_password}
+      - {source: b_root, target: db_root}
+    volumes: [b_db:/var/lib/mysql]
+    networks: [b]
+  web_a:
+    <<: *web
+    environment: {LAB_TENANT: a, LAB_PORT: '18981', LAB_DB_HOST: db_a}
+    secrets:
+      - {source: a_db, target: db_password}
+      - {source: a_salts, target: wp_salts}
+    volumes:
+      - a_code:/var/www/html:ro
+      - a_uploads:/var/www/html/wp-content/uploads
+    networks: [a, front_a]
+    depends_on: {db_a: {condition: service_healthy}}
+  web_b:
+    <<: *web
+    environment: {LAB_TENANT: b, LAB_PORT: '18982', LAB_DB_HOST: db_b}
+    secrets:
+      - {source: b_db, target: db_password}
+      - {source: b_salts, target: wp_salts}
+    volumes:
+      - b_code:/var/www/html:ro
+      - b_uploads:/var/www/html/wp-content/uploads
+    networks: [b, front_b]
+    depends_on: {db_b: {condition: service_healthy}}
+  proxy_a:
+    <<: *proxy
+    ports: ['127.0.0.1:18981:8080']
+    environment: {LAB_UPSTREAM: web_a}
+    networks: [front_a, edge_a]
+    depends_on: [web_a]
+  proxy_b:
+    <<: *proxy
+    ports: ['127.0.0.1:18982:8080']
+    environment: {LAB_UPSTREAM: web_b}
+    networks: [front_b, edge_b]
+    depends_on: [web_b]
+networks:
+  a: {internal: true}
+  b: {internal: true}
+  front_a: {internal: true}
+  front_b: {internal: true}
+  edge_a: {}
+  edge_b: {}
+volumes:
+  a_db: {}
+  b_db: {}
+  a_code: {}
+  b_code: {}
+  a_uploads: {}
+  b_uploads: {}
+secrets:
+  a_db: {file: '${LAB_STATE_DIR:?}/a_db'}
+  a_root: {file: '${LAB_STATE_DIR:?}/a_root'}
+  a_salts: {file: '${LAB_STATE_DIR:?}/a_salts'}
+  b_db: {file: '${LAB_STATE_DIR:?}/b_db'}
+  b_root: {file: '${LAB_STATE_DIR:?}/b_root'}
+  b_salts: {file: '${LAB_STATE_DIR:?}/b_salts'}
