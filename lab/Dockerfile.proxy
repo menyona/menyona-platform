@@ -1,0 +1,5 @@
+ARG CADDY_IMAGE
+FROM ${CADDY_IMAGE}
+# Port 8080 needs no privileged bind capability. Keep cap_drop ALL at runtime.
+RUN setcap -r /usr/bin/caddy
+USER 33:33
