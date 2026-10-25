@@ -58,8 +58,8 @@ def local_client():
 def browser_failure(state):
     path=state/'browser-failure.json'
     failure=json.loads(path.read_text()) if path.exists() else {'phase':'setup','code':'browser_setup_failed'}
-    phases={'setup','launch','product','keyboard','checkout_fields','axe','checkout_submit','account_security'}
-    codes={'browser_setup_failed','browser_operation_failed','chromium_sandbox_unavailable',
+    phases={'setup','launch','product','keyboard','add_to_cart','cart','checkout_fields','axe','checkout_submit','account_security'}
+    codes={'browser_setup_failed','browser_operation_failed','browser_timeout','chromium_sandbox_unavailable',
            'product_page_loaded','arabic_document','rtl_document','main_landmark','keyboard_skip_link',
            'keyboard_reaches_add_to_cart','cart_has_product','accessibility_tree_has_named_controls',
            'classic_checkout_order_received','anonymous_order_api_denied','customer_login_completed',

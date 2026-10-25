@@ -23,7 +23,7 @@ function check(name, result) { checks[name] = !!result; if (!result) { failureCo
     phase='product';
     const page = await context.newPage();
     check('product_page_loaded', new URL(fixtures.a.product_url).origin === base);
-    const productPage=await page.goto(fixtures.a.product_url, {waitUntil: 'networkidle'});
+    const productPage=await page.goto(fixtures.a.product_url, {waitUntil: 'load'});
     check('product_page_loaded', productPage.ok() && await page.locator('form.cart .single_add_to_cart_button').count() === 1);
     check('arabic_document', await page.locator('html').getAttribute('lang') === 'ar');
     check('rtl_document', await page.locator('html').getAttribute('dir') === 'rtl');
@@ -37,12 +37,14 @@ function check(name, result) { checks[name] = !!result; if (!result) { failureCo
       await page.keyboard.press('Tab');
     }
     check('keyboard_reaches_add_to_cart', reached);
+    phase='add_to_cart';
     await page.keyboard.press('Enter');
-    await page.waitForLoadState('networkidle');
-    await page.goto(`${base}/?page_id=${fixtures.a.cart}`, {waitUntil: 'networkidle'});
+    await page.locator('.woocommerce-message').waitFor({state:'visible'});
+    phase='cart';
+    await page.goto(`${base}/?page_id=${fixtures.a.cart}`, {waitUntil: 'load'});
     check('cart_has_product', await page.locator('.cart_item').count() === 1);
     phase='checkout_fields';
-    await page.goto(`${base}/?page_id=${fixtures.a.checkout}`, {waitUntil: 'networkidle'});
+    await page.goto(`${base}/?page_id=${fixtures.a.checkout}`, {waitUntil: 'load'});
     const fields = {billing_first_name:'عميل', billing_last_name:'تجريبي', billing_address_1:'عنوان وهمي', billing_city:'مدينة تجريبية', billing_state:'منطقة تجريبية', billing_postcode:'12345', billing_phone:'0500000000', billing_email:'guest@example.invalid'};
     for (const [id,value] of Object.entries(fields)) {
       const input = page.locator('#'+id);
@@ -78,16 +80,16 @@ function check(name, result) { checks[name] = !!result; if (!result) { failureCo
     check('customer_login_completed', login.status() === 200);
     const aCookies = await context.cookies(base);
     check('customer_has_login_cookie', aCookies.some(c=>c.name.startsWith('wordpress_logged_in_')));
-    await page.goto(`${base}/?page_id=${fixtures.a.account}`,{waitUntil:'networkidle'});
+    await page.goto(`${base}/?page_id=${fixtures.a.account}`,{waitUntil:'load'});
     check('customer_own_account_access', await page.locator('.woocommerce-MyAccount-content').count()===1 && (await page.locator('body').innerText()).includes('customer_a'));
-    await page.goto(fixtures.a.own_order_url,{waitUntil:'networkidle'});
+    await page.goto(fixtures.a.own_order_url,{waitUntil:'load'});
     check('customer_own_order_access', await page.locator('.woocommerce-order-details').count()===1 && (await page.locator('body').innerText()).includes('وجبة تجريبية a'));
     const adminAttempt=await context.request.post(base+'/wp-login.php',{form:{log:'lab_setup',pwd:credentials.a.admin_password,testcookie:'1'}});
     check('setup_administrator_web_login_denied', (await adminAttempt.text()).includes('restricted to local CLI'));
     // localhost ports share a cookie domain; independently salted site cookies must not authenticate B.
-    const accountB=await page.goto(`${other}/?page_id=${fixtures.b.account}`,{waitUntil:'networkidle'});
+    const accountB=await page.goto(`${other}/?page_id=${fixtures.b.account}`,{waitUntil:'load'});
     check('copied_a_cookie_cannot_login_b', accountB.ok() && await page.locator('form.woocommerce-form-login').count() === 1);
-    await page.goto(fixtures.b.own_order_url,{waitUntil:'networkidle'});
+    await page.goto(fixtures.b.own_order_url,{waitUntil:'load'});
     check('copied_a_cookie_cannot_view_b_order', await page.locator('.woocommerce-order-details').count()===0 && await page.locator('form.woocommerce-form-login').count()===1);
     const forbidden = await context.request.get(`${other}/?rest_route=/wc/v3/orders/${fixtures.b.private_order}`);
     check('customer_a_cross_order_api_denied', [401,403].includes(forbidden.status()));
@@ -99,6 +101,7 @@ function check(name, result) { checks[name] = !!result; if (!result) { failureCo
   } finally { await browser.close(); }
 })().catch(error=> {
   if (phase==='launch' && error.message.includes('No usable sandbox')) failureCode='chromium_sandbox_unavailable';
+  else if (failureCode==='browser_operation_failed' && error.name==='TimeoutError') failureCode='browser_timeout';
   fs.writeFileSync(path.join(state,'browser-failure.json'),JSON.stringify({phase,code:failureCode}),{mode:0o600});
   fs.writeFileSync(path.join(state,'browser-raw-error.txt'),error.stack || error.message,{mode:0o600});
   console.error('Browser laboratory failed at '+phase+' ('+failureCode+')');
