@@ -13,6 +13,8 @@ update_option('woocommerce_calc_taxes', 'no');
 update_option('woocommerce_enable_guest_checkout', 'yes');
 update_option('woocommerce_allow_tracking', 'no');
 update_option('woocommerce_task_list_hidden', 'yes');
+// Explicitly expose only the loopback synthetic shop, not a real store launch.
+update_option('woocommerce_coming_soon', 'no');
 update_option('woocommerce_cod_settings', ['enabled' => 'yes', 'title' => 'الدفع عند الاستلام — تجربة محلية', 'enable_for_virtual' => 'yes']);
 update_option('woocommerce_enable_checkout_login_reminder', 'no');
 update_option('permalink_structure', '');
