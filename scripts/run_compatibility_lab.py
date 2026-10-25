@@ -55,6 +55,28 @@ def local_client():
                                       urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 
 
+def browser_failure(state):
+    path=state/'browser-failure.json'
+    failure=json.loads(path.read_text()) if path.exists() else {'phase':'setup','code':'browser_setup_failed'}
+    phases={'setup','launch','product','keyboard','checkout_fields','axe','checkout_submit','account_security'}
+    codes={'browser_setup_failed','browser_operation_failed','chromium_sandbox_unavailable',
+           'arabic_document','rtl_document','main_landmark','keyboard_skip_link',
+           'keyboard_reaches_add_to_cart','cart_has_product','accessibility_tree_has_named_controls',
+           'classic_checkout_order_received','anonymous_order_api_denied','customer_login_completed',
+           'customer_has_login_cookie','customer_own_account_access','customer_own_order_access',
+           'setup_administrator_web_login_denied','copied_a_cookie_cannot_login_b',
+           'copied_a_cookie_cannot_view_b_order','customer_a_cross_order_api_denied','php_upload_http_denied'}
+    codes.update('label_'+name for name in ('billing_first_name','billing_last_name','billing_address_1',
+                 'billing_city','billing_state','billing_postcode','billing_phone','billing_email'))
+    if (not isinstance(failure,dict) or set(failure)!={'phase','code'} or
+            not isinstance(failure.get('phase'),str) or not isinstance(failure.get('code'),str) or
+            failure['phase'] not in phases or failure['code'] not in codes):
+        raise RuntimeError('Invalid browser failure record')
+    blocked=failure['phase']=='launch' and failure['code']=='chromium_sandbox_unavailable'
+    return {'status':'BLOCKED' if blocked else 'FAIL','phase':failure['phase'],
+            'code':failure['code'],'human_screen_reader':'NOT_RUN'}
+
+
 def http_checkout(fixtures, credentials):
     client=local_client()
     a='http://127.0.0.1:18981'; b='http://127.0.0.1:18982'
@@ -303,9 +325,7 @@ def run(state, info, env):
         browser_result=json.loads(browser_output.strip().splitlines()[-1])
         browser_result['status']='FAIL' if browser_result['axe']['status']=='FAIL' else 'PASS'
     except RuntimeError:
-        diagnostic=Path(env['LAB_DIAGNOSTICS']).read_text()
-        if 'No usable sandbox' not in diagnostic: raise
-        browser_result={'status':'BLOCKED','reason':'chromium_sandbox_unavailable','human_screen_reader':'NOT_RUN'}
+        browser_result=browser_failure(state)
     results={tenant:php(tenant,'verify',{'web_order':http_result['order']} if tenant=='a' else None) for tenant in ('a','b')}
     ids={service:command(compose+['ps','-q',service],env=env).strip()
          for service in ('web_a','web_b','db_a','db_b','proxy_a','proxy_b')}

@@ -9,7 +9,9 @@ const credentials = JSON.parse(fs.readFileSync(path.join(state, 'credentials.jso
 const base = 'http://127.0.0.1:18981';
 const other = 'http://127.0.0.1:18982';
 const checks = {};
-function check(name, result) { checks[name] = !!result; if (!result) throw Error(name); }
+let phase="launch";
+let failureCode="browser_operation_failed";
+function check(name, result) { checks[name] = !!result; if (!result) { failureCode=name; throw Error(name); } }
 (async () => {
   const browser = await chromium.launch({executablePath: process.env.LAB_CHROMIUM, headless: true, chromiumSandbox: true, args: ['--disable-dev-shm-usage']});
   try {
@@ -18,11 +20,13 @@ function check(name, result) { checks[name] = !!result; if (!result) throw Error
       const url = new URL(route.request().url());
       return url.protocol === 'http:' && url.hostname === '127.0.0.1' && ['18981','18982'].includes(url.port) ? route.continue() : route.abort();
     });
+    phase='product';
     const page = await context.newPage();
     await page.goto(`${base}/?p=${fixtures.a.product}`, {waitUntil: 'networkidle'});
     check('arabic_document', await page.locator('html').getAttribute('lang') === 'ar');
     check('rtl_document', await page.locator('html').getAttribute('dir') === 'rtl');
     check('main_landmark', await page.locator('main').count() === 1);
+    phase='keyboard';
     await page.keyboard.press('Tab');
     check('keyboard_skip_link', await page.evaluate(() => document.activeElement.matches('a[href^="#"]') && !!document.activeElement.textContent.trim()));
     let reached = false;
@@ -35,6 +39,7 @@ function check(name, result) { checks[name] = !!result; if (!result) throw Error
     await page.waitForLoadState('networkidle');
     await page.goto(`${base}/?page_id=${fixtures.a.cart}`, {waitUntil: 'networkidle'});
     check('cart_has_product', await page.locator('.cart_item').count() === 1);
+    phase='checkout_fields';
     await page.goto(`${base}/?page_id=${fixtures.a.checkout}`, {waitUntil: 'networkidle'});
     const fields = {billing_first_name:'عميل', billing_last_name:'تجريبي', billing_address_1:'عنوان وهمي', billing_city:'مدينة تجريبية', billing_state:'منطقة تجريبية', billing_postcode:'12345', billing_phone:'0500000000', billing_email:'guest@example.invalid'};
     for (const [id,value] of Object.entries(fields)) {
@@ -44,6 +49,7 @@ function check(name, result) { checks[name] = !!result; if (!result) throw Error
       await page.keyboard.insertText(value);
       await page.keyboard.press('Tab');
     }
+    phase='axe';
     await page.addScriptTag({path:axePath});
     const axe = await page.evaluate(async()=> {
       const r=await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}});
@@ -52,6 +58,7 @@ function check(name, result) { checks[name] = !!result; if (!result) throw Error
     const ax = await context.newCDPSession(page);
     const tree = await ax.send('Accessibility.getFullAXTree');
     check('accessibility_tree_has_named_controls', tree.nodes.some(n=>n.role?.value==='textbox' && n.name?.value));
+    phase='checkout_submit';
     await page.locator('#payment_method_cod').check();
     const terms=page.locator('#terms');
     if (await terms.count()) await terms.check();
@@ -64,6 +71,7 @@ function check(name, result) { checks[name] = !!result; if (!result) throw Error
     const unauth=await context.request.get(`${other}/?rest_route=/wc/v3/orders/${fixtures.b.private_order}`);
     check('anonymous_order_api_denied', [401,403].includes(unauth.status()));
     await context.request.get(base+'/wp-login.php');
+    phase='account_security';
     const login = await context.request.post(base+'/wp-login.php',{form:{log:'customer_a',pwd:credentials.a.customer_password,redirect_to:`${base}/?page_id=${fixtures.a.account}`,testcookie:'1'}});
     check('customer_login_completed', login.status() === 200);
     const aCookies = await context.cookies(base);
@@ -87,4 +95,10 @@ function check(name, result) { checks[name] = !!result; if (!result) throw Error
     fs.writeFileSync(path.join(state,'browser-results.json'),JSON.stringify(result,null,2)+'\n',{mode:0o600});
     console.log(JSON.stringify(result));
   } finally { await browser.close(); }
-})().catch(error=> { console.error('Browser laboratory check failed: '+error.message.replace(/https?:\/\/[^\s]+/g,'[local page]')); process.exit(1); });
+})().catch(error=> {
+  if (phase==='launch' && error.message.includes('No usable sandbox')) failureCode='chromium_sandbox_unavailable';
+  fs.writeFileSync(path.join(state,'browser-failure.json'),JSON.stringify({phase,code:failureCode}),{mode:0o600});
+  fs.writeFileSync(path.join(state,'browser-raw-error.txt'),error.stack || error.message,{mode:0o600});
+  console.error('Browser laboratory failed at '+phase+' ('+failureCode+')');
+  process.exit(1);
+});

@@ -15,6 +15,29 @@ spec.loader.exec_module(lab)
 
 
 class LaboratorySafetyTests(unittest.TestCase):
+    def test_only_launch_sandbox_failure_is_blocked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            lab.write_json(root/'browser-failure.json',{'phase':'launch','code':'chromium_sandbox_unavailable'})
+            self.assertEqual(lab.browser_failure(root)['status'],'BLOCKED')
+
+    def test_functional_browser_failure_remains_fail(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            lab.write_json(root/'browser-failure.json',{'phase':'checkout_submit','code':'browser_operation_failed'})
+            self.assertEqual(lab.browser_failure(root)['status'],'FAIL')
+
+    def test_browser_failure_cannot_publish_extra_or_free_text_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for value in ({'phase':'launch','code':'failed','extra':'private-diagnostic'},
+                          {'phase':'checkout_fields','code':'free text with sensitive data'},
+                          {'phase':'unknown_phase','code':'browser_operation_failed'},
+                          {'phase':'checkout_fields','code':'secret_like_lowercase_code'},
+                          {'phase':['launch'],'code':'browser_operation_failed'}):
+                lab.write_json(root/'browser-failure.json',value)
+                with self.assertRaises(RuntimeError): lab.browser_failure(root)
+
     def test_local_http_rejects_external_initial_urls(self):
         for value in ('https://127.0.0.1:18981/','http://example.invalid/',
                       'http://127.0.0.1:80/','http://user@127.0.0.1:18981/',
