@@ -57,7 +57,19 @@ function check(name, result) { checks[name] = !!result; if (!result) { failureCo
     await page.addScriptTag({path:axePath});
     const axe = await page.evaluate(async()=> {
       const r=await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}});
-      return {status:r.violations.length?'FAIL':'PASS',violations:r.violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.length})), passes:r.passes.length};
+      const tags=new Set(['a','p','span','label','abbr','button','input','div','select','textarea']);
+      const ids=new Set(['place_order','terms','billing_first_name','billing_last_name','billing_country','billing_address_1','billing_address_2','billing_company','billing_city','billing_state','billing_phone','billing_email','billing_postcode','coupon_code','order_comments','payment_method_cod','select2-billing_country-container']);
+      const classes=new Set(['required','optional','button','alt','woocommerce-info','woocommerce-privacy-policy-text','woocommerce-terms-and-conditions-checkbox-text','woocommerce-input-wrapper','woocommerce-form__input-checkbox','woocommerce-form__label-for-checkbox','showcoupon','screen-reader-text','woocommerce-password-strength','input-text','woocommerce-form-coupon-toggle']);
+      return {status:r.violations.length?'FAIL':'PASS',violations:r.violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.length,details:v.nodes.map(n=>{
+        let el=null;
+        try {if(typeof n.target[0]==='string') el=document.querySelector(n.target[0]);}catch{}
+        const data=n.any.find(check=>check.id==='color-contrast')?.data||{};
+        const color=value=>typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value)?value:null;
+        return {tag:tags.has(el?.tagName.toLowerCase())?el.tagName.toLowerCase():null,
+          id:ids.has(el?.id)?el.id:null,classes:el?[...el.classList].filter(c=>classes.has(c)):[],
+          foreground:color(data.fgColor),background:color(data.bgColor),
+          ratio:Number.isFinite(data.contrastRatio)?data.contrastRatio:null};
+      })})), passes:r.passes.length};
     });
     const ax = await context.newCDPSession(page);
     const tree = await ax.send('Accessibility.getFullAXTree');
