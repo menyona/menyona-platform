@@ -22,7 +22,9 @@ function check(name, result) { checks[name] = !!result; if (!result) { failureCo
     });
     phase='product';
     const page = await context.newPage();
-    await page.goto(`${base}/?p=${fixtures.a.product}`, {waitUntil: 'networkidle'});
+    check('product_page_loaded', new URL(fixtures.a.product_url).origin === base);
+    const productPage=await page.goto(fixtures.a.product_url, {waitUntil: 'networkidle'});
+    check('product_page_loaded', productPage.ok() && await page.locator('form.cart .single_add_to_cart_button').count() === 1);
     check('arabic_document', await page.locator('html').getAttribute('lang') === 'ar');
     check('rtl_document', await page.locator('html').getAttribute('dir') === 'rtl');
     check('main_landmark', await page.locator('main').count() === 1);

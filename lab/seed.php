@@ -67,6 +67,7 @@ $private_order->calculate_totals();
 $private_order->save();
 $result['private_order'] = $private_order->get_id();
 $result['shipping_method'] = 'free_shipping:' . $shipping_instance;
+$result['product_url'] = get_permalink($product->get_id());
 $result['own_order_url'] = wc_get_endpoint_url('view-order', $private_order->get_id(), wc_get_page_permalink('myaccount'));
 update_option('menyona_lab_fixture', $result);
 echo json_encode($result) . "\n";
